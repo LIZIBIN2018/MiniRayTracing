@@ -7,12 +7,12 @@ class Solid
 {
 public: // ctor & dtor 
     Solid() = default;
-    Solid(Vec3u emt,  Vec4u col,  double glsy,  double mir): 
+    Solid(Vec3d emt,  Vec4d col,  double glsy,  double mir): 
            emit{emt}, color{col}, glossy{glsy}, mirror{mir} { }
     virtual ~Solid() = default;
 protected:
-    Vec3u   emit;       //发光
-    Vec4u   color;      //漫反射 + 透明度
+    Vec3d   emit;       //发光
+    Vec4d   color;      //漫反射 + 透明度
     double  glossy;     //镜面放射 
     double  mirror;     //镜面的比例
     virtual const Vec3d getNormal(const Vec3d &pos = Vec3d{}) = 0; 
@@ -37,10 +37,10 @@ class Rect: public Solid
 {
     Vec3d vertex[4];  //顶点
     Vec3d normal;     //法线
-public:
+public: //ctor & dtor
     Rect() = default;
     ~Rect() = default; 
-    Rect(Vec3u emt, Vec4u col, double glsy, double mir, const Vec3d *vers):Solid(emt, col, glsy, mir)
+    Rect(Vec3d emt, Vec4d col, double glsy, double mir, const Vec3d *vers):Solid(emt, col, glsy, mir)
     {   // 默认逆时针
         vertex[0] = vers[0];
         vertex[1] = vers[1];
@@ -48,32 +48,50 @@ public:
         vertex[3] = vers[3];
         normal = (vertex[1] - vertex[0]).cross(vertex[2] - vertex[1]).unitlize();
     }
+public: // facility 
+    // 1.getNormal
     const Vec3d getNormal(const Vec3d &dir = Vec3d{}) override {return normal;}
+    
+    // 2.interscet
     virtual std::pair<double,Ray> intersect(const Ray &ray)
     { 
-        if(std::fabs(ray.dir.dot(normal)) < _tol) // 与面平行，与法向量垂直
+        if(std::fabs(ray.dir.dot(normal)) >= _tol) // 不与面平行，与法向量垂直
         {
-            if(std::fabs((ray.end - vertex[0]).dot(normal)) < _tol) // 直接在面上
+            double t_hit = 0; // 算出使end + t*dir 位于面上的t
+            // dir是单位向量，t_hit代表了end到hit point的距离
+            // t = normal*(vertex[0] - end)/(normal*dir)
+            t_hit = normal.dot(vertex[0] - ray.end) / (normal.dot(ray.dir)); 
+            if(t_hit > 0)
             {
-                Ray bounceRay{ray.end, Vec3d{}, Vec3u{color.x, color.y,color.z}, 0};
-                return std::pair<double, Ray>{0, bounceRay};
-            }
-            else
-            {
-                return std::pair<double, Ray>{__DBL_MAX__, ray};
+                auto p_hit = ray.end + t_hit * ray.dir;
+                 // 检查是不是在里面
+                double s  = (vertex[0] - vertex[2]).cross(vertex[0] - vertex[1]).norm();
+                double s1 = (p_hit - vertex[0]).cross(p_hit - vertex[1]).norm();
+                double s2 = (p_hit - vertex[1]).cross(p_hit - vertex[2]).norm();
+                double s3 = (p_hit - vertex[2]).cross(p_hit - vertex[0]).norm();
+                bool in_tri1 = fabs(s - s1 - s2 - s3) < _tol;
+
+                s = (vertex[0] - vertex[2]).cross(vertex[0] - vertex[3]).norm();
+                s1 = (p_hit - vertex[0]).cross(p_hit - vertex[2]).norm();
+                s2 = (p_hit - vertex[2]).cross(p_hit - vertex[3]).norm();
+                s3 = (p_hit - vertex[3]).cross(p_hit - vertex[0]).norm();
+                bool in_tri2 = fabs(s - s1 - s2 - s3) < _tol;
+
+                if (in_tri1 || in_tri2) // 唯一一种有交的情况
+                {
+                    Ray bounceRay{ray.end + t_hit * ray.dir, ray.dir - 2*normal.dot(ray.dir)*normal, 
+                                  Vec3d{color.x*ray.col.x*normal.dot(-ray.dir), 
+                                        color.y*ray.col.y*normal.dot(-ray.dir),
+                                        color.z*ray.col.z*normal.dot(-ray.dir)},  // TODO 夹角相关
+                                  ray.bounceTime+1};
+                    if (!(emit==0))
+                        bounceRay.hit_light = true;
+                    return std::pair<double, Ray>{t_hit, bounceRay}; 
+                }
             }
         }
-        double t_hit = 0; // 算出end + t*dir 位于面上。
-        // dir是单位向量，t_hit代表了end到hit point的距离
-        // t = normal*(vertex[0] - end)/(normal*dir)
-        t_hit = normal.dot(vertex[0] - ray.end) / (normal.dot(ray.dir));  
-        if( t_hit < 0) // not hit
-        {
-            return std::pair<double, Ray>{__DBL_MAX__, ray};
-        }
-        
-        Ray bounceRay{ray.end + t_hit * ray.dir, 2*normal.dot(ray.dir)*normal - ray.dir, Vec3u{color.x, color.y,color.z}, 0};
-        return std::pair<double, Ray>{t_hit, bounceRay};    
+        Ray bounceRay{ray.end, ray.dir, Vec3d{0,0,0}, 0};
+        return std::pair<double, Ray>{__DBL_MAX__, bounceRay};   
     }
 };
 
@@ -85,7 +103,7 @@ class Sphere: public Solid
 public:
     Sphere()  = default;
     ~Sphere() = default;
-    Sphere(Vec3u emt, Vec4u col, double glsy, double mir, const Vec3d &c, double r): 
+    Sphere(Vec3d emt, Vec4d col, double glsy, double mir, const Vec3d &c, double r): 
             Solid(emt, col, glsy, mir), center(c), radius(r) { }
     
     const Vec3d getNormal(const Vec3d &pos = Vec3d{}) override
@@ -129,8 +147,13 @@ public:
 
         Vec3d point_hit = ray.end + t_hit * ray.dir;
         Vec3d normal_hit = getNormal(point_hit);
-        Ray bounceRay{ray.end + t_hit * ray.dir, 2*normal_hit.dot(ray.dir)*normal_hit - ray.dir, Vec3u{color.x, color.y,color.z}, 0};
+        Ray bounceRay{ray.end + t_hit * ray.dir, ray.dir - 2*normal_hit.dot(ray.dir)*normal_hit, 
+                      Vec3d{color.x*ray.col.x*normal_hit.dot(-ray.dir), 
+                            color.y*ray.col.y*normal_hit.dot(-ray.dir),
+                            color.z*ray.col.z*normal_hit.dot(-ray.dir)}, //TODO 夹角相关 
+                      ray.bounceTime+1};
+        if (!(emit==0))
+            bounceRay.hit_light = true;
         return std::pair<double, Ray>{t_hit, bounceRay};    
     }
 };
-

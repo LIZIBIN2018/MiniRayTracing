@@ -41,7 +41,7 @@ public:
     Vec3(T xx = 0,T yy = 0,T zz = 0):x{xx},y{yy},z{zz}{}
     ~Vec3()=default;
 
-public:
+public: /// operator override
     // Vector operator
     VEC3_OPT_OVERRIDE(+)
     VEC3_OPT_OVERRIDE(-)
@@ -50,7 +50,20 @@ public:
     VEC3_OPT_MULDIV(+)
     VEC3_OPT_MULDIV(-)
     VEC3_OPT_MULDIV(*)
-    VEC3_OPT_MULDIV(/)    
+    VEC3_OPT_MULDIV(/)
+
+    // Compare operator
+    bool operator==(const Vec3 &rhs) const { 
+        return (x==rhs.x)&&(y==rhs.y)&&(z==rhs.z);}
+    bool operator==(double rhs) const { 
+        if(rhs!=0) return false;
+        return (x==T(0))&&(y==T(0))&&(z==T(0));
+    }
+
+    // Negative
+    Vec3 operator-() const { return Vec3{-x,-y,-z};} //TOTEST
+
+
 public:
     // Vector geometry
     T       dot(const Vec3<T> &rhs) const { return x*rhs.x + y*rhs.y + z*rhs.z;}

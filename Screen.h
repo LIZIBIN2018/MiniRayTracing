@@ -18,9 +18,12 @@ class Screen
 public:
     Screen(int w = 1,int h = 1, Vec3d ep = Vec3d{}, double gs = 0.001, double dst = 0.1);
     ~Screen();
-    void rendering(const Scene &);
+
+public:
+    void setScene(const Scene &extScene){ scene = &extScene; }
+    void rendering();
     void output();
-    void drawPixel(int x, int y, unsigned char r, unsigned char g, unsigned char b);
+    void drawPixel(int x, int y, double r, double g, double b);
     std::pair<double, Ray> intersect(const Ray &r);
     
 

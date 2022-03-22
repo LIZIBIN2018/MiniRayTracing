@@ -7,11 +7,12 @@ struct Ray
 {
     Vec3d end;
     Vec3d dir;
-    Vec3u col;
-    int bound;
+    Vec3d col; // as white defaultly. if not hit light source, set zero.
+    int bounceTime;
+    bool hit_light = false;
     Ray() = default;
-    Ray(Vec3d endPoint, Vec3d direction, Vec3u color = Vec3u{},int bd = 0): 
-        end{endPoint}, dir{direction.unitlize()}, col{color}, bound{bd} { }
+    Ray(Vec3d endPoint, Vec3d direction, Vec3d color = Vec3d{1.0,1.0,1.0},int bt = 0): 
+        end{endPoint}, dir{direction.unitlize()}, col{color}, bounceTime{bt} { }
     ~Ray() = default;
 
     void show() 
