@@ -38,7 +38,9 @@ int main()
     Scene scene;
     create_scene(scene);
 
-    Screen screen(1200*2, 900*2, Vec3d{}, 0.00025 ,0.6);
+    int width = 1024;
+    int height = width / 16 * 9;
+    Screen screen(width, height, Vec3d{}, 0.6/double(width) ,0.6);
     screen.rendering(scene);
     screen.output();
     return 0;
